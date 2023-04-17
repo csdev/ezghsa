@@ -1,12 +1,12 @@
 services:
   app:
-    image: csang/golang-template:latest
+    image: csang/ezghsa:latest
     build:
       context: .
       dockerfile: ./build/prod/Dockerfile
 
   dev:
-    image: csang/golang-template-dev:latest
+    image: csang/ezghsa-dev:latest
     build:
       context: .
       dockerfile: ./build/dev/Dockerfile
