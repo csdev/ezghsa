@@ -1,0 +1,22 @@
+services:
+  app:
+    image: csang/golang-template:latest
+    build:
+      context: .
+      dockerfile: ./build/prod/Dockerfile
+
+  dev:
+    image: csang/golang-template-dev:latest
+    build:
+      context: .
+      dockerfile: ./build/dev/Dockerfile
+
+  test:
+    extends:
+      service: dev
+    command: ["go", "test", "-v", "./..."]
+
+  cover:
+    extends:
+      service: dev
+    command: ["/bin/sh", "-c", "go test -coverprofile=c.out './...' && go tool cover -func=c.out"]
