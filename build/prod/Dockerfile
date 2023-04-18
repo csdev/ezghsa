@@ -2,13 +2,15 @@ FROM golang:1.19-alpine AS builder
 
 ARG SERVICE=go
 
+RUN apk add --no-cache gcc musl-dev pkgconf
+
 WORKDIR /opt/$SERVICE
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
 COPY . .
 RUN mkdir "/opt/$SERVICE/bin" \
-    && go build -o "/opt/$SERVICE/bin" -v ./...
+    && go build -ldflags "-linkmode 'external' -extldflags '-static'" -o "/opt/$SERVICE/bin" -v ./...
 
 FROM alpine:latest
 
