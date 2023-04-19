@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -48,6 +47,8 @@ func main() {
 
 		severity     ezghsa.SeverityLevel
 		failSeverity ezghsa.SeverityLevel
+
+		ownerRepoNames []string
 	)
 
 	flag.BoolVarP(&help, "help", "h", help, "display this help text")
@@ -59,10 +60,15 @@ func main() {
 	flag.VarP(&SeverityValue{&severity}, "severity", "s", "only consider alerts at or above the specified severity level")
 	flag.VarP(&SeverityValue{&failSeverity}, "fail-severity", "f", "fail if alerts exist at or above the specified severity level")
 
+	flag.StringSliceVarP(&ownerRepoNames, "repos", "r", ownerRepoNames, "comma-separated list of repos to check, in OWNER/REPO format")
+
 	flag.CommandLine.SortFlags = false
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [options] [github organization/repo]\n", os.Args[0])
+		const usage = "Usage: %s [options]\n" +
+			"       %s [options] --repos OWNER/REPO[,...]\n"
+
+		fmt.Fprintf(os.Stderr, usage, os.Args[0], os.Args[0])
 		flag.PrintDefaults()
 	}
 
@@ -83,69 +89,69 @@ func main() {
 		return
 	}
 
+	if flag.NArg() > 0 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	if failSeverity != ezghsa.Unknown && failSeverity < severity {
 		fmt.Fprintln(os.Stderr, "conflicting options for \"-f, --fail-severity\" and \"-s, --severity\" flags")
 		fmt.Fprintln(os.Stderr, "fail-severity threshold cannot be lower than severity filter")
 		os.Exit(1)
 	}
 
-	client := ezghsa.Client()
+	app := ezghsa.New(ezghsa.DefaultHttpClient())
 
-	opts := &github.RepositoryListOptions{
-		Affiliation: "owner",
-	}
-	repos, _, err := client.Repositories.List(context.Background(), "", opts)
-	if err != nil {
-		log.Fatalf("%v", err)
+	var repos []*github.Repository
+	if len(ownerRepoNames) > 0 {
+		var err error
+		repos, err = app.GetRepos(ownerRepoNames)
+		if err != nil {
+			log.Fatalf("error getting repositories: %v", err)
+		}
+	} else {
+		var err error
+		repos, err = app.GetMyRepos()
+		if err != nil {
+			log.Fatalf("error getting repositories for the current user: %v", err)
+		}
 	}
 
 	worstSeverity := ezghsa.Unknown
 	hasDisabled := false
 
 	for _, repo := range repos {
-		isEnabled, _, err := client.Repositories.GetVulnerabilityAlerts(
-			context.Background(), *repo.Owner.Login, *repo.Name)
+		ownerName := repo.GetOwner().GetLogin()
+		repoName := repo.GetName()
+
+		isEnabled, err := app.CheckAlertsEnabled(ownerName, repoName)
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
 		if !isEnabled {
 			hasDisabled = true
 			if listAll || failDisabled {
-				fmt.Printf("%s/%s\n%s\n", *repo.Owner.Login, *repo.Name,
+				fmt.Printf("%s/%s\n%s\n", ownerName, repoName,
 					gchalk.Dim("vulnerability alerts are disabled"))
 			}
 			continue
 		}
 
-		opts := &github.ListAlertsOptions{
-			State: github.String("open"),
-		}
-		alerts, _, err := client.Dependabot.ListRepoAlerts(context.Background(), *repo.Owner.Login, *repo.Name, opts)
+		alerts, err := app.GetOpenAlerts(ownerName, repoName)
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
 
-		selectedAlerts := make([]*github.DependabotAlert, 0, len(alerts))
-
-		for _, alert := range alerts {
-			adv := alert.SecurityAdvisory
-			sev, _ := ezghsa.Severity(adv.GetSeverity())
-
-			if sev < severity {
-				continue
-			}
-			selectedAlerts = append(selectedAlerts, alert)
-		}
-
+		selectedAlerts := ezghsa.FilterBySeverity(alerts, severity)
 		if len(selectedAlerts) == 0 {
 			if listAll {
-				fmt.Printf("%s/%s\n%s\n", *repo.Owner.Login, *repo.Name,
+				fmt.Printf("%s/%s\n%s\n", ownerName, repoName,
 					gchalk.Dim("no matching vulnerability alerts found"))
 			}
 			continue
 		}
 
-		fmt.Printf("%s/%s\n", *repo.Owner.Login, *repo.Name)
+		fmt.Printf("%s/%s\n", ownerName, repoName)
 
 		for _, alert := range alerts {
 			adv := alert.SecurityAdvisory

@@ -3,8 +3,10 @@ package ezghsa
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/google/go-github/v51/github"
 	"golang.org/x/oauth2"
@@ -49,19 +51,105 @@ func getToken() string {
 	return h["github.com"].OAuthToken
 }
 
-func Client() *github.Client {
+func DefaultHttpClient() *http.Client {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: getToken()},
 	)
-	tc := oauth2.NewClient(ctx, ts)
+	return oauth2.NewClient(ctx, ts)
+}
 
-	client := github.NewClient(tc)
+type App struct {
+	client *github.Client
+	user   *github.User
+}
+
+func New(httpClient *http.Client) *App {
+	client := github.NewClient(httpClient)
 
 	if client.UserAgent != "" {
 		client.UserAgent += " "
 	}
 	client.UserAgent += "ezghsa (+https://github.com/csdev/ezghsa)"
 
-	return client
+	return &App{
+		client: client,
+	}
+}
+
+func (app *App) loadUser() error {
+	if app.user != nil {
+		return nil
+	}
+
+	user, _, err := app.client.Users.Get(context.Background(), "")
+	if err != nil {
+		return err
+	}
+
+	app.user = user
+	return nil
+}
+
+func (app *App) GetMyRepos() ([]*github.Repository, error) {
+	opts := &github.RepositoryListOptions{
+		Affiliation: "owner",
+	}
+	repos, _, err := app.client.Repositories.List(context.Background(), "", opts)
+	return repos, err
+}
+
+func (app *App) GetRepos(ownerRepoNames []string) ([]*github.Repository, error) {
+	repos := make([]*github.Repository, 0, len(ownerRepoNames))
+	for _, ownerRepoName := range ownerRepoNames {
+		ownerName, repoName, ok := strings.Cut(ownerRepoName, "/")
+		if !ok {
+			// if "owner/" is omitted, default to the name of the current user
+			// (matches the behavior of gh)
+			err := app.loadUser()
+			if err != nil {
+				return nil, err
+			}
+
+			ownerName = app.user.GetLogin()
+			repoName = ownerRepoName
+		}
+
+		repo, _, err := app.client.Repositories.Get(context.Background(), ownerName, repoName)
+		if err != nil {
+			return nil, err
+		}
+		repos = append(repos, repo)
+	}
+	return repos, nil
+}
+
+func (app *App) CheckAlertsEnabled(ownerName string, repoName string) (bool, error) {
+	isEnabled, _, err := app.client.Repositories.GetVulnerabilityAlerts(
+		context.Background(), ownerName, repoName)
+	return isEnabled, err
+}
+
+func (app *App) GetOpenAlerts(ownerName string, repoName string) ([]*github.DependabotAlert, error) {
+	opts := &github.ListAlertsOptions{
+		State: github.String("open"),
+	}
+	alerts, _, err := app.client.Dependabot.ListRepoAlerts(context.Background(), ownerName, repoName, opts)
+	return alerts, err
+}
+
+func FilterBySeverity(alerts []*github.DependabotAlert, severity SeverityLevel) []*github.DependabotAlert {
+	selectedAlerts := make([]*github.DependabotAlert, 0, len(alerts))
+
+	for _, alert := range alerts {
+		adv := alert.SecurityAdvisory
+		sev, _ := Severity(adv.GetSeverity())
+
+		if sev < severity {
+			continue
+		}
+		selectedAlerts = append(selectedAlerts, alert)
+	}
+
+	return selectedAlerts
 }
