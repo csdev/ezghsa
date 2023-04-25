@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
+	"time"
 
 	"github.com/csdev/ezghsa/internal/ezghsa"
 	"github.com/google/go-github/v51/github"
@@ -35,6 +36,20 @@ func (v SeverityValue) Set(s string) error {
 
 func (v SeverityValue) Type() string {
 	return "string"
+}
+
+func DayAbbrev(dur *time.Duration) string {
+	days := dur.Hours() / 24
+	s := fmt.Sprintf("%3dd", int(days))
+	if days < 0 {
+		return gchalk.Dim(s)
+	} else if days < 7 {
+		return gchalk.Blue(s)
+	} else if days < 30 {
+		return gchalk.Yellow(s)
+	} else {
+		return gchalk.Red(s)
+	}
 }
 
 func main() {
@@ -119,6 +134,7 @@ func main() {
 
 	worstSeverity := ezghsa.Unknown
 	hasDisabled := false
+	now := time.Now().UTC()
 
 	for _, repo := range repos {
 		ownerName := repo.GetOwner().GetLogin()
@@ -156,12 +172,14 @@ func main() {
 		for _, alert := range alerts {
 			adv := alert.SecurityAdvisory
 			sev, _ := ezghsa.Severity(adv.GetSeverity())
+			dur := now.Sub(alert.CreatedAt.Time)
 
 			if sev > worstSeverity {
 				worstSeverity = sev
 			}
 
-			fmt.Printf("%s %s %s\n", sev.Abbrev(), gchalk.Bold(adv.GetGHSAID()), adv.GetSummary())
+			fmt.Printf("%s %s %s %s\n", sev.Abbrev(), gchalk.Bold(adv.GetGHSAID()), DayAbbrev(&dur),
+				adv.GetSummary())
 		}
 	}
 
