@@ -73,21 +73,21 @@ func main() {
 	flag.BoolVarP(&version, "version", "V", version, "display version and build info")
 
 	flag.BoolVarP(&listAll, "list-all", "l", listAll, "list all repos that were checked, even those without vulnerabilities")
-	flag.BoolVarP(&failDisabled, "fail-disabled", "d", failDisabled, "fail if severity alerts are disabled for a repo")
+	flag.BoolVarP(&failDisabled, "fail-disabled", "D", failDisabled, "fail if severity alerts are disabled for a repo")
 
 	flag.VarP(&SeverityValue{&severity}, "severity", "s", "only consider alerts at or above the specified severity level")
-	flag.VarP(&SeverityValue{&failSeverity}, "fail-severity", "f", "fail if alerts exist at or above the specified severity level")
+	flag.VarP(&SeverityValue{&failSeverity}, "fail-severity", "S", "fail if alerts exist at or above the specified severity level")
 
 	flag.IntVarP(&days, "age", "a", days, "only consider alerts older than the specified number of days")
 	flag.IntVarP(&failDays, "fail-age", "A", failDays, "fail if alerts are older than the specified number of days")
 
-	flag.StringSliceVarP(&ownerRepoNames, "repos", "r", ownerRepoNames, "comma-separated list of repos to check, in OWNER/REPO format")
+	flag.StringSliceVarP(&ownerRepoNames, "repo", "r", ownerRepoNames, "comma-separated list of repos to check, in OWNER/REPO format")
 
 	flag.CommandLine.SortFlags = false
 
 	flag.Usage = func() {
 		const usage = "Usage: %s [options]\n" +
-			"       %s [options] --repos OWNER/REPO[,...]\n"
+			"       %s [options] --repo OWNER/REPO[,...]\n"
 
 		fmt.Fprintf(os.Stderr, usage, os.Args[0], os.Args[0])
 		flag.PrintDefaults()
@@ -116,7 +116,7 @@ func main() {
 	}
 
 	if failSeverity != ezghsa.Unknown && failSeverity < severity {
-		fmt.Fprintln(os.Stderr, "conflicting options for \"-f, --fail-severity\" and \"-s, --severity\" flags")
+		fmt.Fprintln(os.Stderr, "conflicting options for \"-s, --severity\" and \"-S, --fail-severity\" flags")
 		fmt.Fprintln(os.Stderr, "fail-severity threshold cannot be lower than severity filter")
 		os.Exit(1)
 	}

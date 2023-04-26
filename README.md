@@ -41,7 +41,7 @@ Alternatively, pass in your token via the `GITHUB_TOKEN` environment variable.
 ezghsa
 
 # List alerts for specific repos
-ezghsa --repos=csdev/ezghsa,csdev/csdev.github.io
+ezghsa --repo=csdev/ezghsa,csdev/csdev.github.io
 
 # Filter alerts by severity (low, medium, high, critical)
 # Fail if there are critical alerts
