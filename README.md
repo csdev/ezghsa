@@ -57,3 +57,13 @@ ezghsa --fail-disabled
 # List all repos, whether vulnerable or not
 ezghsa --list-all
 ```
+
+## License
+
+EZGHSA is licensed under the MIT License. See [LICENSE.txt](LICENSE.txt).
+
+The statically-linked distribution uses musl libc
+([MIT licensed](https://git.musl-libc.org/cgit/musl/tree/COPYRIGHT)).
+
+For information on Go module dependencies and links to their open-source licenses,
+see the [go.mod](go.mod) file or run `ezghsa --version`.
