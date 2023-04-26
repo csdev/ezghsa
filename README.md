@@ -47,6 +47,10 @@ ezghsa --repos=csdev/ezghsa,csdev/csdev.github.io
 # Fail if there are critical alerts
 ezghsa --severity=medium --fail-severity=critical
 
+# Filter alerts by age, in days
+# Fail if alerts have been open longer than the threshold
+ezghsa --age=30 --fail-age=30
+
 # List alerts, fail if alerts are disabled
 ezghsa --fail-disabled
 

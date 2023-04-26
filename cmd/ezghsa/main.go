@@ -63,6 +63,9 @@ func main() {
 		severity     ezghsa.SeverityLevel
 		failSeverity ezghsa.SeverityLevel
 
+		days     int
+		failDays int
+
 		ownerRepoNames []string
 	)
 
@@ -74,6 +77,9 @@ func main() {
 
 	flag.VarP(&SeverityValue{&severity}, "severity", "s", "only consider alerts at or above the specified severity level")
 	flag.VarP(&SeverityValue{&failSeverity}, "fail-severity", "f", "fail if alerts exist at or above the specified severity level")
+
+	flag.IntVarP(&days, "age", "a", days, "only consider alerts older than the specified number of days")
+	flag.IntVarP(&failDays, "fail-age", "A", failDays, "fail if alerts are older than the specified number of days")
 
 	flag.StringSliceVarP(&ownerRepoNames, "repos", "r", ownerRepoNames, "comma-separated list of repos to check, in OWNER/REPO format")
 
@@ -114,6 +120,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "fail-severity threshold cannot be lower than severity filter")
 		os.Exit(1)
 	}
+	if days != 0 && failDays != 0 && days > failDays {
+		fmt.Fprintln(os.Stderr, "conflicting options for \"-a, --age\" and \"-A --fail-age\" flags")
+		fmt.Fprintln(os.Stderr, "failure age cannot be lower than age filter")
+		os.Exit(1)
+	}
 
 	app := ezghsa.New(ezghsa.DefaultHttpClient())
 
@@ -132,9 +143,15 @@ func main() {
 		}
 	}
 
-	worstSeverity := ezghsa.Unknown
-	hasDisabled := false
 	now := time.Now().UTC()
+	hasDisabled := false
+	worstSeverity := ezghsa.Unknown
+	oldestCreated := now
+
+	cutoffTime := now
+	if days != 0 {
+		cutoffTime = now.AddDate(0, 0, -days)
+	}
 
 	for _, repo := range repos {
 		ownerName := repo.GetOwner().GetLogin()
@@ -158,7 +175,11 @@ func main() {
 			log.Fatalf("%v", err)
 		}
 
-		selectedAlerts := ezghsa.FilterBySeverity(alerts, severity)
+		selectedAlerts := ezghsa.FilterAlerts(alerts, func(a *github.DependabotAlert) bool {
+			sev, _ := ezghsa.Severity(a.SecurityAdvisory.GetSeverity())
+			return sev >= severity && a.CreatedAt.Time.Before(cutoffTime)
+		})
+
 		if len(selectedAlerts) == 0 {
 			if listAll {
 				fmt.Printf("%s/%s\n%s\n", ownerName, repoName,
@@ -177,6 +198,9 @@ func main() {
 			if sev > worstSeverity {
 				worstSeverity = sev
 			}
+			if alert.CreatedAt.Time.Before(oldestCreated) {
+				oldestCreated = alert.CreatedAt.Time
+			}
 
 			fmt.Printf("%s %s %s %s\n", sev.Abbrev(), gchalk.Bold(adv.GetGHSAID()), DayAbbrev(&dur),
 				adv.GetSummary())
@@ -185,6 +209,9 @@ func main() {
 
 	if failSeverity != ezghsa.Unknown && worstSeverity >= failSeverity {
 		os.Exit(1 + int(worstSeverity))
+	}
+	if failDays != 0 && oldestCreated.Before(now.AddDate(0, 0, -failDays)) {
+		os.Exit(1)
 	}
 	if failDisabled && hasDisabled {
 		os.Exit(1)

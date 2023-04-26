@@ -138,18 +138,13 @@ func (app *App) GetOpenAlerts(ownerName string, repoName string) ([]*github.Depe
 	return alerts, err
 }
 
-func FilterBySeverity(alerts []*github.DependabotAlert, severity SeverityLevel) []*github.DependabotAlert {
+func FilterAlerts(alerts []*github.DependabotAlert, fn func(*github.DependabotAlert) bool) []*github.DependabotAlert {
 	selectedAlerts := make([]*github.DependabotAlert, 0, len(alerts))
 
 	for _, alert := range alerts {
-		adv := alert.SecurityAdvisory
-		sev, _ := Severity(adv.GetSeverity())
-
-		if sev < severity {
-			continue
+		if fn(alert) {
+			selectedAlerts = append(selectedAlerts, alert)
 		}
-		selectedAlerts = append(selectedAlerts, alert)
 	}
-
 	return selectedAlerts
 }
