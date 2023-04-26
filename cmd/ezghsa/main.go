@@ -60,6 +60,9 @@ func main() {
 		listAll      bool
 		failDisabled bool
 
+		ghsa string
+		cve  string
+
 		severity     ezghsa.SeverityLevel
 		failSeverity ezghsa.SeverityLevel
 
@@ -74,6 +77,9 @@ func main() {
 
 	flag.BoolVarP(&listAll, "list-all", "l", listAll, "list all repos that were checked, even those without vulnerabilities")
 	flag.BoolVarP(&failDisabled, "fail-disabled", "D", failDisabled, "fail if severity alerts are disabled for a repo")
+
+	flag.StringVarP(&ghsa, "ghsa", "g", ghsa, "filter alerts by GHSA ID")
+	flag.StringVarP(&cve, "cve", "c", cve, "filter alerts by CVE ID")
 
 	flag.VarP(&SeverityValue{&severity}, "severity", "s", "only consider alerts at or above the specified severity level")
 	flag.VarP(&SeverityValue{&failSeverity}, "fail-severity", "S", "fail if alerts exist at or above the specified severity level")
@@ -176,6 +182,13 @@ func main() {
 		}
 
 		selectedAlerts := ezghsa.FilterAlerts(alerts, func(a *github.DependabotAlert) bool {
+			if ghsa != "" && a.SecurityAdvisory.GetGHSAID() != ghsa {
+				return false
+			}
+			if cve != "" && a.SecurityAdvisory.GetCVEID() != cve {
+				return false
+			}
+
 			sev, _ := ezghsa.Severity(a.SecurityAdvisory.GetSeverity())
 			return sev >= severity && a.CreatedAt.Time.Before(cutoffTime)
 		})
@@ -190,7 +203,7 @@ func main() {
 
 		fmt.Printf("%s/%s\n", ownerName, repoName)
 
-		for _, alert := range alerts {
+		for _, alert := range selectedAlerts {
 			adv := alert.SecurityAdvisory
 			sev, _ := ezghsa.Severity(adv.GetSeverity())
 			dur := now.Sub(alert.CreatedAt.Time)
