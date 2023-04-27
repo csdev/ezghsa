@@ -1,5 +1,7 @@
 # EZGHSA
 
+![ezghsa command-line screenshot](ezghsa.png)
+
 ## Features
 
 EZGHSA is a command-line tool for summarizing and filtering vulnerability alerts on Github repositories.
@@ -10,11 +12,16 @@ EZGHSA is a command-line tool for summarizing and filtering vulnerability alerts
 * Check if alerts are enabled or disabled.
 * Run interactively or from CI/CD scripts.
 
-## Github Authentication
+## Setup and Install
 
-EZGHSA needs to authenticate with the Github API. (Authentication is required even for public repos,
-since Github rate-limits unauthenticated API calls.)
+### Standalone Binary (Recommended)
 
+Download EZGHSA from the Github [releases page](https://github.com/csdev/ezghsa/releases).
+The binary is statically-linked, so no other dependencies are needed.
+
+### Github Authentication
+
+EZGHSA needs to authenticate with the Github API.
 Create a fine-grained access token with the following repository permissions:
 
 * **Administration (read-only)** - Required to check if Dependabot alerts are enabled on the repository.
@@ -31,7 +38,27 @@ github.com:
     oauth_token: github_pat_asdf1234asdf1234
 ```
 
-Alternatively, pass in your token via the `GITHUB_TOKEN` environment variable.
+Alternatively, you can use a personal access token with similar permissions.
+
+EZGHSA also respects the `GITHUB_TOKEN` environment variable. This makes it easy to use on Github Actions
+and other CI environments.
+
+### Docker (Advanced)
+
+A Docker container is provided for advanced workflows that cannot use the standalone binaries.
+
+With credentials from the environment:
+
+```bash
+docker run -e GITHUB_TOKEN --rm csang/ezghsa:latest
+```
+
+With a bind-mounted credential file:
+
+```bash
+docker run -v "$HOME/.config/ezghsa/hosts.yml:/home/go/.config/ezghsa/hosts.yml:ro" \
+    --rm csang/ezghsa:latest
+```
 
 ## Examples
 
@@ -42,10 +69,16 @@ ezghsa
 # List alerts for specific repos
 ezghsa --repo=csdev/ezghsa,csdev/csdev.github.io
 
+# Filter alerts by GHSA ID
+ezghsa --ghsa=GHSA-pxvg-2qj5-37jq
+
+# Filter alerts by CVE ID
+ezghsa --cve=CVE-2023-29469
+
 # Filter alerts by severity (low, medium, high, critical)
 ezghsa --severity=medium
 
-# Fail if alerts have been open longer 30 days
+# Filter and fail if alerts have been open longer than 30 days
 ezghsa --days=30 --fail
 
 # List all repos, fail if alerts are disabled
