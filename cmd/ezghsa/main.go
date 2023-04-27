@@ -59,15 +59,12 @@ func main() {
 
 		listAll      bool
 		failDisabled bool
+		fail         bool
 
-		ghsa string
-		cve  string
-
-		severity     ezghsa.SeverityLevel
-		failSeverity ezghsa.SeverityLevel
-
+		ghsa     string
+		cve      string
+		severity ezghsa.SeverityLevel
 		days     int
-		failDays int
 
 		ownerRepoNames []string
 	)
@@ -77,15 +74,13 @@ func main() {
 
 	flag.BoolVarP(&listAll, "list-all", "l", listAll, "list all repos that were checked, even those without vulnerabilities")
 	flag.BoolVarP(&failDisabled, "fail-disabled", "D", failDisabled, "fail if severity alerts are disabled for a repo")
+	flag.BoolVarP(&fail, "fail", "F", fail, "fail if matching alerts are found")
 
+	// filter options
 	flag.StringVarP(&ghsa, "ghsa", "g", ghsa, "filter alerts by GHSA ID")
 	flag.StringVarP(&cve, "cve", "c", cve, "filter alerts by CVE ID")
-
-	flag.VarP(&SeverityValue{&severity}, "severity", "s", "only consider alerts at or above the specified severity level")
-	flag.VarP(&SeverityValue{&failSeverity}, "fail-severity", "S", "fail if alerts exist at or above the specified severity level")
-
-	flag.IntVarP(&days, "age", "a", days, "only consider alerts older than the specified number of days")
-	flag.IntVarP(&failDays, "fail-age", "A", failDays, "fail if alerts are older than the specified number of days")
+	flag.VarP(&SeverityValue{&severity}, "severity", "s", "filter to alerts at or above the specified severity level")
+	flag.IntVarP(&days, "days", "d", days, "filter to alerts older than the specified number of days")
 
 	flag.StringSliceVarP(&ownerRepoNames, "repo", "r", ownerRepoNames, "comma-separated list of repos to check, in OWNER/REPO format")
 
@@ -121,17 +116,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if failSeverity != ezghsa.Unknown && failSeverity < severity {
-		fmt.Fprintln(os.Stderr, "conflicting options for \"-s, --severity\" and \"-S, --fail-severity\" flags")
-		fmt.Fprintln(os.Stderr, "fail-severity threshold cannot be lower than severity filter")
-		os.Exit(1)
-	}
-	if days != 0 && failDays != 0 && days > failDays {
-		fmt.Fprintln(os.Stderr, "conflicting options for \"-a, --age\" and \"-A --fail-age\" flags")
-		fmt.Fprintln(os.Stderr, "failure age cannot be lower than age filter")
-		os.Exit(1)
-	}
-
 	app := ezghsa.New(ezghsa.DefaultHttpClient())
 
 	var repos []*github.Repository
@@ -152,7 +136,7 @@ func main() {
 	now := time.Now().UTC()
 	hasDisabled := false
 	worstSeverity := ezghsa.Unknown
-	oldestCreated := now
+	alertCount := 0
 
 	cutoffTime := now
 	if days != 0 {
@@ -204,6 +188,7 @@ func main() {
 		fmt.Printf("%s/%s\n", ownerName, repoName)
 
 		for _, alert := range selectedAlerts {
+			alertCount++
 			adv := alert.SecurityAdvisory
 			sev, _ := ezghsa.Severity(adv.GetSeverity())
 			dur := now.Sub(alert.CreatedAt.Time)
@@ -211,20 +196,14 @@ func main() {
 			if sev > worstSeverity {
 				worstSeverity = sev
 			}
-			if alert.CreatedAt.Time.Before(oldestCreated) {
-				oldestCreated = alert.CreatedAt.Time
-			}
 
 			fmt.Printf("%s %s %s %s\n", sev.Abbrev(), gchalk.Bold(adv.GetGHSAID()), DayAbbrev(&dur),
 				adv.GetSummary())
 		}
 	}
 
-	if failSeverity != ezghsa.Unknown && worstSeverity >= failSeverity {
+	if fail && alertCount > 0 {
 		os.Exit(1 + int(worstSeverity))
-	}
-	if failDays != 0 && oldestCreated.Before(now.AddDate(0, 0, -failDays)) {
-		os.Exit(1)
 	}
 	if failDisabled && hasDisabled {
 		os.Exit(1)

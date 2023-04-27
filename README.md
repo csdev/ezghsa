@@ -6,8 +6,7 @@ EZGHSA is a command-line tool for summarizing and filtering vulnerability alerts
 
 * List alerts for a user, organization, or specific set of repositories.
 * Display Github Security Advisory (GHSA) IDs.
-* Filter alerts by severity.
-* Fail if alerts exceed the specified severity.
+* Filter alerts by ID, severity, and age.
 * Check if alerts are enabled or disabled.
 * Run interactively or from CI/CD scripts.
 
@@ -44,19 +43,25 @@ ezghsa
 ezghsa --repo=csdev/ezghsa,csdev/csdev.github.io
 
 # Filter alerts by severity (low, medium, high, critical)
-# Fail if there are critical alerts
-ezghsa --severity=medium --fail-severity=critical
+ezghsa --severity=medium
 
-# Filter alerts by age, in days
-# Fail if alerts have been open longer than the threshold
-ezghsa --age=30 --fail-age=30
+# Fail if alerts have been open longer 30 days
+ezghsa --days=30 --fail
 
-# List alerts, fail if alerts are disabled
-ezghsa --fail-disabled
-
-# List all repos, whether vulnerable or not
-ezghsa --list-all
+# List all repos, fail if alerts are disabled
+ezghsa --list-all --fail-disabled
 ```
+
+## Exit Status
+
+`ezghsa --fail` exits with a non-zero status code if any matching alerts are found.
+The status code indicates the highest severity alert that was found.
+
+1. Unknown / generic error
+2. Low severity (LO)
+3. Medium severity (MD)
+4. High severity (HI)
+5. Critical severity (CR)
 
 ## License
 
