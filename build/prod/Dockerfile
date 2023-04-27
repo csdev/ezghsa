@@ -29,5 +29,4 @@ WORKDIR /opt/$SERVICE/bin
 COPY --from=builder /opt/$SERVICE/bin .
 
 USER $SERVICE
-ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["/bin/sh"]
+ENTRYPOINT ["/sbin/tini", "--", "/opt/go/bin/ezghsa"]
