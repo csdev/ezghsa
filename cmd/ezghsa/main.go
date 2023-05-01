@@ -65,6 +65,7 @@ func main() {
 		cve      string
 		severity ezghsa.SeverityLevel
 		days     int
+		closed   bool
 
 		ownerRepoNames []string
 	)
@@ -81,6 +82,7 @@ func main() {
 	flag.StringVarP(&cve, "cve", "c", cve, "filter alerts by CVE ID")
 	flag.VarP(&SeverityValue{&severity}, "severity", "s", "filter to alerts at or above the specified severity level")
 	flag.IntVarP(&days, "days", "d", days, "filter to alerts older than the specified number of days")
+	flag.BoolVar(&closed, "closed", closed, "include closed alerts")
 
 	flag.StringSliceVarP(&ownerRepoNames, "repo", "r", ownerRepoNames, "comma-separated list of repos to check, in OWNER/REPO format")
 
@@ -160,7 +162,13 @@ func main() {
 			continue
 		}
 
-		alerts, err := app.GetOpenAlerts(ownerName, repoName)
+		var alerts []*github.DependabotAlert
+		if closed {
+			alerts, err = app.GetAllAlerts(ownerName, repoName)
+		} else {
+			alerts, err = app.GetOpenAlerts(ownerName, repoName)
+		}
+
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
@@ -188,17 +196,25 @@ func main() {
 		fmt.Printf("%s/%s\n", ownerName, repoName)
 
 		for _, alert := range selectedAlerts {
-			alertCount++
 			adv := alert.SecurityAdvisory
 			sev, _ := ezghsa.Severity(adv.GetSeverity())
 			dur := now.Sub(alert.CreatedAt.Time)
 
-			if sev > worstSeverity {
-				worstSeverity = sev
+			summary := adv.GetSummary()
+			state := alert.GetState()
+
+			if state != "" && state != "open" {
+				// de-emphasize closed alerts
+				summary = gchalk.Dim(fmt.Sprintf("%s: %s", state, summary))
+			} else {
+				// count open alerts
+				alertCount++
+				if sev > worstSeverity {
+					worstSeverity = sev
+				}
 			}
 
-			fmt.Printf("%s %s %s %s\n", sev.Abbrev(), gchalk.Bold(adv.GetGHSAID()), DayAbbrev(&dur),
-				adv.GetSummary())
+			fmt.Printf("%s %s %s %s\n", sev.Abbrev(), gchalk.Bold(adv.GetGHSAID()), DayAbbrev(&dur), summary)
 		}
 	}
 

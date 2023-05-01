@@ -138,6 +138,12 @@ func (app *App) GetOpenAlerts(ownerName string, repoName string) ([]*github.Depe
 	return alerts, err
 }
 
+func (app *App) GetAllAlerts(ownerName string, repoName string) ([]*github.DependabotAlert, error) {
+	opts := &github.ListAlertsOptions{}
+	alerts, _, err := app.client.Dependabot.ListRepoAlerts(context.Background(), ownerName, repoName, opts)
+	return alerts, err
+}
+
 func FilterAlerts(alerts []*github.DependabotAlert, fn func(*github.DependabotAlert) bool) []*github.DependabotAlert {
 	selectedAlerts := make([]*github.DependabotAlert, 0, len(alerts))
 
