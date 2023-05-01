@@ -96,6 +96,13 @@ The status code indicates the highest severity alert that was found.
 4. High severity (HI)
 5. Critical severity (CR)
 
+## Color Output
+
+EZGHSA supports the `NO_COLOR` and `FORCE_COLOR` environment variables from
+[jwalton/gchalk](https://github.com/jwalton/gchalk#color-detection).
+Color output will be written on TTY and CI environments, unless overridden by
+one of those variables.
+
 ## License
 
 EZGHSA is licensed under the MIT License. See [LICENSE.txt](LICENSE.txt).
