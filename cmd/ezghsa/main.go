@@ -201,8 +201,12 @@ func main() {
 			dur := now.Sub(alert.CreatedAt.Time)
 
 			summary := adv.GetSummary()
-			state := alert.GetState()
+			cveid := adv.GetCVEID()
+			if cveid != "" {
+				summary = fmt.Sprintf("%s (%s)", summary, cveid)
+			}
 
+			state := alert.GetState()
 			if state != "" && state != "open" {
 				// de-emphasize closed alerts
 				summary = gchalk.Dim(fmt.Sprintf("%s: %s", state, summary))
