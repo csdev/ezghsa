@@ -124,6 +124,14 @@ func (app *App) GetRepos(ownerRepoNames []string) ([]*github.Repository, error) 
 	return repos, nil
 }
 
+func (app *App) GetOrgRepos(org string) ([]*github.Repository, error) {
+	opts := &github.RepositoryListByOrgOptions{
+		Type: "all",
+	}
+	repos, _, err := app.client.Repositories.ListByOrg(context.Background(), org, opts)
+	return repos, err
+}
+
 func (app *App) CheckAlertsEnabled(ownerName string, repoName string) (bool, error) {
 	isEnabled, _, err := app.client.Repositories.GetVulnerabilityAlerts(
 		context.Background(), ownerName, repoName)
