@@ -68,6 +68,7 @@ func main() {
 		closed   bool
 
 		ownerRepoNames []string
+		org            string
 	)
 
 	flag.BoolVarP(&help, "help", "h", help, "display this help text")
@@ -85,14 +86,16 @@ func main() {
 	flag.BoolVar(&closed, "closed", closed, "include closed alerts")
 
 	flag.StringSliceVarP(&ownerRepoNames, "repo", "r", ownerRepoNames, "comma-separated list of repos to check, in OWNER/REPO format")
+	flag.StringVarP(&org, "org", "o", org, "check all repos belonging to the specified organization")
 
 	flag.CommandLine.SortFlags = false
 
 	flag.Usage = func() {
 		const usage = "Usage: %s [options]\n" +
-			"       %s [options] --repo OWNER/REPO[,...]\n"
+			"       %s [options] --repo OWNER/REPO[,...]\n" +
+			"       %s [options] --org ORGANIZATION\n\n"
 
-		fmt.Fprintf(os.Stderr, usage, os.Args[0], os.Args[0])
+		fmt.Fprintf(os.Stderr, usage, os.Args[0], os.Args[0], os.Args[0])
 		flag.PrintDefaults()
 	}
 
@@ -113,6 +116,12 @@ func main() {
 		return
 	}
 
+	if flag.CommandLine.Changed("repo") && flag.CommandLine.Changed("org") {
+		fmt.Fprintln(os.Stderr, "--repo and --org are mutually exclusive flags")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	if flag.NArg() > 0 {
 		flag.Usage()
 		os.Exit(1)
@@ -126,6 +135,12 @@ func main() {
 		repos, err = app.GetRepos(ownerRepoNames)
 		if err != nil {
 			log.Fatalf("error getting repositories: %v", err)
+		}
+	} else if org != "" {
+		var err error
+		repos, err = app.GetOrgRepos(org)
+		if err != nil {
+			log.Fatalf("error getting repositories for the organization %s: %v", org, err)
 		}
 	} else {
 		var err error
