@@ -1,4 +1,4 @@
-FROM golang:1.19-alpine
+FROM golang:1.21-alpine
 
 # update this if different user and directory names are needed
 ARG SERVICE=go

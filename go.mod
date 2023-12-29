@@ -1,6 +1,6 @@
 module github.com/csdev/ezghsa
 
-go 1.19
+go 1.21
 
 require (
 	github.com/google/go-github/v51 v51.0.0
